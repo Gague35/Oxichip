@@ -64,7 +64,7 @@ impl Chip8 {
         let x = ((opcode & 0x0F00) >> 8) as u8;  // Second nibble (Register X)
         let _y = ((opcode & 0x00F0) >> 4) as u8; // Third nibble (Register Y)
         let _n = (opcode & 0x000F) as u8;        // Fourth nibble (4-bit constant)
-        let nnn = opcode & 0x0FFF;              // Last 12 bits (Address)
+        let nnn = opcode & 0x0FFF;               // Last 12 bits (Address)
         let kk = (opcode & 0x00FF) as u8;        // Last 8 bits (8-bit constant)
 
         // Match components to find the instruction
@@ -79,10 +79,22 @@ impl Chip8 {
                 self.pc = nnn; // Move PC to target address
                 println!("Jumped to address: {:#X}", nnn);
             }
-            // 6XKK: Set register VX instruction
+            // 3XKK: Skip next instruction if VX == KK
+            (3, _, _, _) => {
+                if self.registers[x as usize] == kk {
+                    self.pc += 2;
+                    println!("Skipped next instruction because V{:X} == {:#X}", x, kk);
+                }
+            }
+            // 6XKK: Set register VX to KK
             (6, _, _, _) => {
-                self.registers[x as usize] = kk; // Store value in register
+                self.registers[x as usize] = kk;
                 println!("Set register V{:X} to {:#X}", x, kk);
+            }
+            // 7XKK: Add KK to register VX
+            (7, _, _, _) => {
+                self.registers[x as usize] += kk;
+                println!("Added {:#X} to register V{:X}", kk, x);
             }
             // Unknown instruction fallback
             _ => {
@@ -99,10 +111,21 @@ fn main() {
     let mut console = Chip8::new(); // Create virtual console
     
     // Setup test program in memory
-    console.memory[0x200] = 0x60; // Opcode 0x60AB: Set V0 to 0xAB
-    console.memory[0x201] = 0xAB;
-    console.memory[0x202] = 0x12; // Opcode 0x1200: Jump to 0x200
-    console.memory[0x203] = 0x00;
+    // Address 0x200: 0x6005 (Set V0 to 0x05)
+    console.memory[0x200] = 0x60;
+    console.memory[0x201] = 0x05;
+
+    // Address 0x202: 0x3005 (Skip next instruction if V0 == 0x05) -> SHOULD SKIP!
+    console.memory[0x202] = 0x30;
+    console.memory[0x203] = 0x05;
+
+    // Address 0x204: 0x61AA (Set V1 to 0xAA) -> THIS SHOULD BE SKIPPED
+    console.memory[0x204] = 0x61;
+    console.memory[0x205] = 0xAA;
+
+    // Address 0x206: 0x1206 (Infinite loop to stop here)
+    console.memory[0x206] = 0x12;
+    console.memory[0x207] = 0x06;
 
     // Infinite execution loop
     loop {
