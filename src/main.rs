@@ -76,7 +76,13 @@ impl Chip8 {
             }
             // 1NNN: Jump instruction
             (1, _, _, _) => {
-                self.pc = nnn; // Move PC to target address
+                // Security: If a JUMP points to its own address, it's an infinite blocking loop.
+                // We stop the emulator safely instead of looping forever in the terminal.
+                if self.pc == nnn + 2 { 
+                    println!("Infinite loop detected at address {:#X}. Stopping emulation.", nnn);
+                    std::process::exit(0);
+                }
+                self.pc = nnn;
                 println!("Jumped to address: {:#X}", nnn);
             }
             // 3XKK: Skip next instruction if VX == KK
@@ -84,6 +90,21 @@ impl Chip8 {
                 if self.registers[x as usize] == kk {
                     self.pc += 2;
                     println!("Skipped next instruction because V{:X} == {:#X}", x, kk);
+                }
+            }
+            // 4XKK: Skip next instruction if VX != KK
+            (4, _, _, _) => {
+                if self.registers[x as usize] != kk {
+                    self.pc += 2;
+                    println!("Skipped next instruction because V{:X} != {:#X}", x, kk);
+                }
+            }
+            // 5XY0: Skip next instruction if VX == VY
+            (5, _, _y, 0) => {
+                if self.registers[x as usize] == self.registers[_y as usize] {
+                    self.pc += 2;
+                    println!("Skipped next instruction because V{:X} ({:#X}) == V{:X} ({:#X})", 
+                        x, self.registers[x as usize], _y, self.registers[_y as usize]);
                 }
             }
             // 6XKK: Set register VX to KK
@@ -115,17 +136,21 @@ fn main() {
     console.memory[0x200] = 0x60;
     console.memory[0x201] = 0x05;
 
-    // Address 0x202: 0x3005 (Skip next instruction if V0 == 0x05) -> SHOULD SKIP!
-    console.memory[0x202] = 0x30;
+    // Address 0x202: 0x6105 (Set V1 to 0x05)
+    console.memory[0x202] = 0x61;
     console.memory[0x203] = 0x05;
 
-    // Address 0x204: 0x61AA (Set V1 to 0xAA) -> THIS SHOULD BE SKIPPED
-    console.memory[0x204] = 0x61;
-    console.memory[0x205] = 0xAA;
+    // Address 0x204: 0x5010 (Skip next instruction if V0 == V1) -> SHOULD SKIP!
+    console.memory[0x204] = 0x50;
+    console.memory[0x205] = 0x10;
 
-    // Address 0x206: 0x1206 (Infinite loop to stop here)
-    console.memory[0x206] = 0x12;
-    console.memory[0x207] = 0x06;
+    // Address 0x206: 0x62AA (Set V2 to 0xAA) -> THIS SHOULD BE SKIPPED
+    console.memory[0x206] = 0x62;
+    console.memory[0x207] = 0xAA;
+
+    // Address 0x208: 0x1208 (Infinite loop to stop here)
+    console.memory[0x208] = 0x12;
+    console.memory[0x209] = 0x08;
 
     // Infinite execution loop
     loop {
