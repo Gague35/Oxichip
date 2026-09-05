@@ -137,6 +137,18 @@ impl Chip8 {
                 self.registers[x as usize] ^= self.registers[y as usize];
                 println!("V{:X} ^= V{:X} -> result: {:#X}", x, y, self.registers[x as usize]);
             } 
+            // 8XY4: Set VX = VX + VY, set VF = carry
+            (8, _, y, 4) => {
+                let val_x = self.registers[x as usize];
+                let val_y = self.registers[y as usize];
+
+                let (sum, overflow) = val_x.overflowing_add(val_y);
+
+                self.registers[x as usize] = sum;
+                self.registers[0xF] = overflow as u8;
+
+                println!("V{:X} += V{:X} -> result: {}, carry (VF): {}", x, y, sum, overflow as u8);
+            }
             // Unknown instruction fallback
             _ => {
                 println!("Unknown opcode: {:#X} - Stopping emulation.", opcode);
@@ -151,21 +163,26 @@ fn main() {
     
     let mut console = Chip8::new(); // Create virtual console
     
-    // Address 0x200: 0x60FF (Set V0 to 0xFF)
-    console.memory[0x200] = 0x60;
-    console.memory[0x201] = 0xFF;
+    // 1. Test SANS dépassement : V0 = 50, V1 = 100 -> V0 doit valoir 150, VF doit valoir 0
+    console.memory[0x200] = 0x60; // Set V0 = 50 (0x32)
+    console.memory[0x201] = 0x32;
 
-    // Address 0x202: 0x610F (Set V1 to 0x0F)
-    console.memory[0x202] = 0x61;
-    console.memory[0x203] = 0x0F;
+    console.memory[0x202] = 0x61; // Set V1 = 100 (0x64)
+    console.memory[0x203] = 0x64;
 
-    // Address 0x204: 0x8013 (V0 = V0 XOR V1) -> V0 should become 0xF0
-    console.memory[0x204] = 0x80;
-    console.memory[0x205] = 0x13;
+    console.memory[0x204] = 0x80; // V0 += V1 (8014)
+    console.memory[0x205] = 0x14;
 
-    // Address 0x206: 0x1206 (Infinite loop to stop here)
-    console.memory[0x206] = 0x12;
-    console.memory[0x207] = 0x06;
+    // 2. Test AVEC dépassement : V0 = 150 + 200 (0xC8) -> V0 doit valoir 94, VF doit valoir 1
+    console.memory[0x206] = 0x61; // Set V1 = 200 (0xC8)
+    console.memory[0x207] = 0xC8;
+
+    console.memory[0x208] = 0x80; // V0 += V1 (8014)
+    console.memory[0x209] = 0x14;
+
+    // Boucle infinie pour s'arrêter
+    console.memory[0x20A] = 0x12;
+    console.memory[0x20B] = 0x0A;
 
     // Infinite execution loop
     loop {
