@@ -1,4 +1,6 @@
-use std::fs::File; // Import file handler
+use std::collections::btree_set::Difference;
+use std::fs::File; use std::hint::select_unpredictable;
+// Import file handler
 use std::io::Read; // Import read operations
 
 // Main emulator structure
@@ -149,6 +151,18 @@ impl Chip8 {
 
                 println!("V{:X} += V{:X} -> result: {}, carry (VF): {}", x, y, sum, overflow as u8);
             }
+            // 8XY5: Set VX = VX - VY, set VF = NOT borrow
+            (8, _, y, 5) => {
+                let val_x = self.registers[x as usize];
+                let val_y = self.registers[y as usize];
+
+                let (diff, overflow) = val_x.overflowing_sub(val_y);
+
+                self.registers[x as usize] = diff;
+                self.registers[0xF] = (!overflow) as u8;
+
+                println!("V{:X} -= V{:X} -> result: {}, VF: {}", x, y, diff, self.registers[0xF]);
+            }
             // Unknown instruction fallback
             _ => {
                 println!("Unknown opcode: {:#X} - Stopping emulation.", opcode);
@@ -163,24 +177,24 @@ fn main() {
     
     let mut console = Chip8::new(); // Create virtual console
     
-    // 1. Test SANS dépassement : V0 = 50, V1 = 100 -> V0 doit valoir 150, VF doit valoir 0
-    console.memory[0x200] = 0x60; // Set V0 = 50 (0x32)
-    console.memory[0x201] = 0x32;
+    // 1. Test WITHOUT borrow: V0 = 100, V1 = 50 -> V0 should be 50, VF should be 1
+    console.memory[0x200] = 0x60; // Set V0 = 100 (0x64)
+    console.memory[0x201] = 0x64;
 
-    console.memory[0x202] = 0x61; // Set V1 = 100 (0x64)
-    console.memory[0x203] = 0x64;
+    console.memory[0x202] = 0x61; // Set V1 = 50 (0x32)
+    console.memory[0x203] = 0x32;
 
-    console.memory[0x204] = 0x80; // V0 += V1 (8014)
-    console.memory[0x205] = 0x14;
+    console.memory[0x204] = 0x80; // V0 -= V1 (8015)
+    console.memory[0x205] = 0x15;
 
-    // 2. Test AVEC dépassement : V0 = 150 + 200 (0xC8) -> V0 doit valoir 94, VF doit valoir 1
-    console.memory[0x206] = 0x61; // Set V1 = 200 (0xC8)
-    console.memory[0x207] = 0xC8;
+    // 2. Test WITH borrow: Set V0 = 30 (0x1E), then V0 -= V1 (30 - 50) -> V0 should be 236, VF should be 0
+    console.memory[0x206] = 0x60; // Set V0 = 30 (0x1E)
+    console.memory[0x207] = 0x1E;
 
-    console.memory[0x208] = 0x80; // V0 += V1 (8014)
-    console.memory[0x209] = 0x14;
+    console.memory[0x208] = 0x80; // V0 -= V1 (8015)
+    console.memory[0x209] = 0x15;
 
-    // Boucle infinie pour s'arrêter
+    // Infinite loop
     console.memory[0x20A] = 0x12;
     console.memory[0x20B] = 0x0A;
 
