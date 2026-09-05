@@ -117,6 +117,26 @@ impl Chip8 {
                 self.registers[x as usize] += kk;
                 println!("Added {:#X} to register V{:X}", kk, x);
             }
+            // 8XY0: Copy VY value to register VX
+            (8, _, y, 0) => {
+                self.registers[x as usize] = self.registers[y as usize];
+                println!("Set V{:X} = V{:X} ({:#X})", x, y, self.registers[x as usize]);
+            }
+            // 8XY1: Set VX = VX OR VY
+            (8, _, y, 1) => {
+                self.registers[x as usize] |= self.registers[y as usize];
+                println!("V{:X} |= V{:X} -> result: {:#X}", x, y, self.registers[x as usize]);
+            }
+            // 8XY2: Set VX = VX AND VY
+            (8, _, y, 2) => {
+                self.registers[x as usize] &= self.registers[y as usize];
+                println!("V{:X} &= V{:X} -> result: {:#X}", x, y, self.registers[x as usize]);
+            }
+            // 8XY3: Set VX = VX XOR VY
+            (8, _, y, 3) => {
+                self.registers[x as usize] ^= self.registers[y as usize];
+                println!("V{:X} ^= V{:X} -> result: {:#X}", x, y, self.registers[x as usize]);
+            } 
             // Unknown instruction fallback
             _ => {
                 println!("Unknown opcode: {:#X} - Stopping emulation.", opcode);
@@ -131,26 +151,21 @@ fn main() {
     
     let mut console = Chip8::new(); // Create virtual console
     
-    // Setup test program in memory
-    // Address 0x200: 0x6005 (Set V0 to 0x05)
+    // Address 0x200: 0x60FF (Set V0 to 0xFF)
     console.memory[0x200] = 0x60;
-    console.memory[0x201] = 0x05;
+    console.memory[0x201] = 0xFF;
 
-    // Address 0x202: 0x6105 (Set V1 to 0x05)
+    // Address 0x202: 0x610F (Set V1 to 0x0F)
     console.memory[0x202] = 0x61;
-    console.memory[0x203] = 0x05;
+    console.memory[0x203] = 0x0F;
 
-    // Address 0x204: 0x5010 (Skip next instruction if V0 == V1) -> SHOULD SKIP!
-    console.memory[0x204] = 0x50;
-    console.memory[0x205] = 0x10;
+    // Address 0x204: 0x8013 (V0 = V0 XOR V1) -> V0 should become 0xF0
+    console.memory[0x204] = 0x80;
+    console.memory[0x205] = 0x13;
 
-    // Address 0x206: 0x62AA (Set V2 to 0xAA) -> THIS SHOULD BE SKIPPED
-    console.memory[0x206] = 0x62;
-    console.memory[0x207] = 0xAA;
-
-    // Address 0x208: 0x1208 (Infinite loop to stop here)
-    console.memory[0x208] = 0x12;
-    console.memory[0x209] = 0x08;
+    // Address 0x206: 0x1206 (Infinite loop to stop here)
+    console.memory[0x206] = 0x12;
+    console.memory[0x207] = 0x06;
 
     // Infinite execution loop
     loop {
